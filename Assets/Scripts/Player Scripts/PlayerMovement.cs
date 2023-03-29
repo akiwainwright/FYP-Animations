@@ -1,11 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class PlayerMovement : MonoBehaviour
 {
+    private Actions m_PlayerActions;
     [SerializeField] private Camera m_PlayerCamera;
 
     private Animator m_Animator;
@@ -17,11 +19,12 @@ public class PlayerMovement : MonoBehaviour
     private Vector3 m_FacingDirection;
     private Vector3 m_RightMovement;
     private Vector3 m_ForwardMovement;
+    private Vector3 m_InputVelocity;
 
     [SerializeField] private float m_MovementSpeed = 5.0f;
     [SerializeField] private float m_RotateRate = 5.0f;
+    [SerializeField] private float m_LocomotionDamp = 0.05f;
 
-    public InputAction playerInput;
     // Start is called before the first frame update
     void Start()
     {
@@ -29,12 +32,21 @@ public class PlayerMovement : MonoBehaviour
         m_Animator = this.GetComponent<Animator>();
 
         Cursor.visible = false;
+        m_InputVelocity = Vector3.zero;
     }
+
+    private void Awake()
+    {
+        m_PlayerActions = new Actions();
+    }
+
 
     // Update is called once per frame
     void Update()
     {
-        m_MovementInput = playerInput.ReadValue<Vector2>();
+        m_MovementInput = m_PlayerActions.PlayerActions.Move.ReadValue<Vector2>();
+
+        m_Animator.SetFloat("Locomotion", m_MovementInput.magnitude, m_LocomotionDamp, Time.deltaTime);
     }
 
     private void FixedUpdate()
@@ -44,26 +56,17 @@ public class PlayerMovement : MonoBehaviour
             Move();
 
             AdjustFacingDirection(m_MovementVector);
-
-            SetMoveAnimation(true);
-        }
-        else
-        {
-            SetMoveAnimation(false);
-        }
-
-
-       
+        }       
     }
 
     private void OnEnable()
     {
-        playerInput.Enable();
+        m_PlayerActions.Enable();
     }
 
     private void OnDisable()
     {
-        playerInput.Disable();
+        m_PlayerActions.Disable();
     }
 
     private void Move()
@@ -74,8 +77,12 @@ public class PlayerMovement : MonoBehaviour
 
         m_MovementVector = (m_RightMovement + m_ForwardMovement).normalized;
 
-        m_Rb.AddForce(m_MovementVector * m_MovementSpeed, ForceMode.VelocityChange);        
+        m_Rb.AddForce(m_MovementVector * m_MovementSpeed, ForceMode.VelocityChange);
+
+        m_InputVelocity.x = m_Rb.velocity.x;
+        m_InputVelocity.z = m_Rb.velocity.z;
     }
+
 
     private void SetMoveAnimation(bool moving)
     {
